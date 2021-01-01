@@ -2,28 +2,35 @@ import tensorflow as tf
 import numpy as np
 
 
-def preprocess_data(raw_data):
+def preprocess_data(raw_data, need_norm_inputs=[], need_categorization_inputs=[]):
     symbolic_inputs = create_symbolic_input(raw_data)
 
-    preprocessed_inputs = [
-        normalize_numeric_input(symbolic_inputs, raw_data),
-        string_input_to_encoding(symbolic_inputs, raw_data)
-    ]
+    preprocessed_inputs = []
 
-    # preprocessed_inputs_concat = tf.keras.layers.Concatenate()(preprocessed_inputs)
+    for key_name in symbolic_inputs:
+        if not(key_name in need_norm_inputs) and not(key_name in need_categorization_inputs):
+            preprocessed_inputs.append(symbolic_inputs[key_name])
 
-    # titanic_preprocessing = tf.keras.Model(raw_data, preprocessed_inputs_concat)
+    preprocessed_inputs.append(
+        normalize_numeric_input(symbolic_inputs, raw_data, need_norm_inputs)
+    )
 
-    # tf.keras.utils.plot_model(model = titanic_preprocessing , rankdir="LR", dpi=72, show_shapes=True)
+    preprocessed_inputs = string_input_to_encoding(
+        symbolic_inputs, preprocessed_inputs, raw_data, need_categorization_inputs)
 
-    print("Finished Preprocessing")
+    preprocessed_inputs = tf.keras.layers.Concatenate()(preprocessed_inputs)
+
+    return {
+        'inputs': symbolic_inputs,
+        'preprocessed_inputs': preprocessed_inputs
+    }
 
 
 def create_symbolic_input(raw_data):
     inputs = {}
     for name, column in raw_data.items():
         dtype = column.dtype
-
+        
         if dtype == object:
             dtype = tf.string
         else:
@@ -34,10 +41,10 @@ def create_symbolic_input(raw_data):
     return inputs
 
 
-def normalize_numeric_input(symbolic_inputs, raw_data):
+def normalize_numeric_input(symbolic_inputs, raw_data, need_norm_inputs):
     numeric_inputs = {
         name: input for name, input in symbolic_inputs.items()
-        if input.dtype == tf.float32
+        if input.dtype == tf.float32 and name in need_norm_inputs
     }
 
     x = tf.keras.layers.Concatenate()(list(numeric_inputs.values()))
@@ -47,16 +54,11 @@ def normalize_numeric_input(symbolic_inputs, raw_data):
     return norm(x)
 
 
-def string_input_to_encoding(symbolic_inputs, raw_data):
-    string_inputs = []
-
+def string_input_to_encoding(symbolic_inputs, preprocessed_inputs, raw_data, need_categorization_inputs):
     for name, input in symbolic_inputs.items():
         # Skip non-string column types since they should already be pre-processed in the normalize_numeric_input()
-        if input.dtype == tf.float32:
+        if input.dtype == tf.float32 or not(name in need_categorization_inputs):
             continue
-
-            
-        print(raw_data[name])
 
         # Maps strings from a vocabulary to integer indices https://www.tensorflow.org/api_docs/python/tf/keras/layers/experimental/preprocessing/StringLookup.
         lookup = tf.keras.layers.experimental.preprocessing.StringLookup(
@@ -70,6 +72,6 @@ def string_input_to_encoding(symbolic_inputs, raw_data):
         # Convert the lookup indices into one-hor vector (Example: from a index 3 to [0, 0, 0, 1])
         x = one_hot(x)
 
-        string_inputs.append(x)
+        preprocessed_inputs.append(x)
 
-    return string_inputs
+    return preprocessed_inputs

@@ -1,10 +1,15 @@
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+
 from utils import file_import, pre_processing
 
 train_dataset = file_import.getDataSet()
 test_dataset = file_import.getTestSet()
+
+X_train = None
+Y_train = train_dataset["Survived"]
+X_test = None
 
 combine = [train_dataset, test_dataset]
 
@@ -79,14 +84,43 @@ for dataset in combine:
 # We also can drop the SibSp and Parch since we created the more useful isAlone column
 
 train_dataset = train_dataset.drop(
-    ['Name', 'Ticket', 'Cabin', 'SibSp', 'Parch'], axis=1)
+    ['PassengerId', 'Survived', 'Name', 'Ticket', 'Cabin', 'SibSp', 'Parch'], axis=1)
 test_dataset = test_dataset.drop(
-    ['Name', 'Ticket', 'Cabin', 'SibSp', 'Parch'], axis=1)
+    ['PassengerId', 'Name', 'Ticket', 'Cabin', 'SibSp', 'Parch'], axis=1)
 combine = [train_dataset, test_dataset]
 
-#Heres we print how the data look like for visualization
-print(train_dataset)
+# Now we call the pre_processing file in the utils modules that will do the more advanced data mapping such as
+# Indexation of strings, one-hot string lookup, normalization of values and so on
+processed_inputs = pre_processing.preprocess_data(
+    train_dataset,
+    ['Fare', 'Age'],
+    ['Sex', 'Embarked', 'Title']
+)
 
-#Now we call the pre_processing file in the utils modules that will do the more advanced data mapping such as 
-#Indexation of strings, normalization of values and so on
-pre_processing.preprocess_data(train_dataset)
+body = tf.keras.Sequential(
+    [tf.keras.layers.Dense(64), tf.keras.layers.Dense(1)]
+)
+
+result = body(processed_inputs['preprocessed_inputs'])
+model = tf.keras.Model(processed_inputs['inputs'], processed_inputs['preprocessed_inputs'])
+model.compile(loss=tf.losses.BinaryCrossentropy(from_logits=True),
+              optimizer=tf.optimizers.Adam())
+
+X_train = train_dataset.copy()
+X_test = test_dataset.copy()
+
+print(X_train.head())
+print(processed_inputs['inputs'])
+
+# model.fit(x = X_train, y = Y_train, epochs=10)
+
+# Y_pred = model.predict(X_test)
+
+# print(Y_pred)
+# titanic_preprocessing = tf.keras.Model(train_dataset, model_inputs)
+
+# titanic_features_dict = {name: np.array(value)
+#                          for name, value in train_dataset.items()}
+# features_dict = {name: values[:1]
+#                  for name, values in titanic_features_dict.items()}
+# titanic_preprocessing(features_dict)
