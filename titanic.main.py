@@ -8,7 +8,7 @@ train_dataset = file_import.getDataSet()
 test_dataset = file_import.getTestSet()
 
 X_train = None
-Y_train = train_dataset["Survived"]
+Y_train = train_dataset.pop('Survived')
 X_test = None
 
 combine = [train_dataset, test_dataset]
@@ -84,7 +84,7 @@ for dataset in combine:
 # We also can drop the SibSp and Parch since we created the more useful isAlone column
 
 train_dataset = train_dataset.drop(
-    ['PassengerId', 'Survived', 'Name', 'Ticket', 'Cabin', 'SibSp', 'Parch'], axis=1)
+    ['PassengerId', 'Name', 'Ticket', 'Cabin', 'SibSp', 'Parch'], axis=1)
 test_dataset = test_dataset.drop(
     ['PassengerId', 'Name', 'Ticket', 'Cabin', 'SibSp', 'Parch'], axis=1)
 combine = [train_dataset, test_dataset]
@@ -97,30 +97,38 @@ processed_inputs = pre_processing.preprocess_data(
     ['Sex', 'Embarked', 'Title']
 )
 
-body = tf.keras.Sequential(
-    [tf.keras.layers.Dense(64), tf.keras.layers.Dense(1)]
-)
+preprocessing_model = tf.keras.Model(processed_inputs['inputs'], processed_inputs['preprocessed_inputs'])
+tensor_inputs = processed_inputs['inputs']
 
-result = body(processed_inputs['preprocessed_inputs'])
-model = tf.keras.Model(processed_inputs['inputs'], processed_inputs['preprocessed_inputs'])
-model.compile(loss=tf.losses.BinaryCrossentropy(from_logits=True),
-              optimizer=tf.optimizers.Adam())
+X_train = {name: np.array(value) for name, value in train_dataset.items()}
 
-X_train = train_dataset.copy()
-X_test = test_dataset.copy()
+NUM_EXAMPLES = len(Y_train)
 
-print(X_train.head())
-print(processed_inputs['inputs'])
+def make_input_fn(X, y, n_epochs=None, shuffle=True):
+    def input_fn():
+        dataset = tf.data.Dataset.from_tensor_slices((X, y))
+        if shuffle:
+            dataset = dataset.shuffle(NUM_EXAMPLES)
+        # For training, cycle thru dataset as many times as need (n_epochs=None).
+        dataset = dataset.repeat(n_epochs)
+        # In memory training doesn't use batching.
+        dataset = dataset.batch(NUM_EXAMPLES)
+        return dataset
+    return input_fn
 
-# model.fit(x = X_train, y = Y_train, epochs=10)
 
-# Y_pred = model.predict(X_test)
+# Training and evaluation input functions.
+train_input_fn = make_input_fn(X_train, Y_train)
+eval_input_fn = make_input_fn(X_train, Y_train, shuffle=False, n_epochs=1)
 
-# print(Y_pred)
-# titanic_preprocessing = tf.keras.Model(train_dataset, model_inputs)
+input_list = []
+for key, value in tensor_inputs.items():
+    tf.identity(value, name=key)
+    input_list.append(value)
 
-# titanic_features_dict = {name: np.array(value)
-#                          for name, value in train_dataset.items()}
-# features_dict = {name: values[:1]
-#                  for name, values in titanic_features_dict.items()}
-# titanic_preprocessing(features_dict)
+linear_est = tf.estimator.LinearClassifier(input_list)
+
+# # Train model.
+linear_est.train(train_input_fn, max_steps=100)
+result = linear_est.evaluate(eval_input_fn)
+print(pd.Series(result))
