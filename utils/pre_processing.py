@@ -14,21 +14,23 @@ def preprocess_data(raw_data, need_norm_inputs=[], need_categorization_inputs=[]
                 key_name, dtype=tf.dtypes.float32))
             preprocessed_inputs.append(symbolic_inputs[key_name])
 
-    # GET THE FEATURE COLUMSN FROM NORMALIZE INPUT AND STRING ENCONDING
-    preprocessed_inputs.append(
-        normalize_numeric_input(symbolic_inputs, raw_data,
-                                need_norm_inputs, feature_columns)
-    )
+    normalized_inputs = normalize_numeric_input(symbolic_inputs, raw_data,
+                                                need_norm_inputs, feature_columns)
 
-    preprocessed_inputs = string_input_to_encoding(
+    preprocessed_inputs.append(normalized_inputs['normalized_inputs'])
+
+    feature_columns = normalized_inputs['feature_columns']
+
+    preprocessed_inputs, feature_columns = string_input_to_encoding(
         symbolic_inputs, preprocessed_inputs, raw_data, need_categorization_inputs, feature_columns)
 
     preprocessed_inputs = tf.keras.layers.Concatenate()(preprocessed_inputs)
 
-    return {
-        'inputs': symbolic_inputs,
-        'preprocessed_inputs': preprocessed_inputs
-    }
+    return (
+        symbolic_inputs,
+        preprocessed_inputs,
+        feature_columns
+    )
 
 
 def create_symbolic_input(raw_data):
@@ -58,7 +60,8 @@ def normalize_numeric_input(symbolic_inputs, raw_data, need_norm_inputs, feature
 
     for key_name in numeric_inputs:
         feature_columns.append(tf.feature_column.numeric_column(
-            key_name, dtype=tf.dtypes.float32))
+            key_name, dtype=tf.dtypes.float32, normalizer_fn=tf.keras.layers.experimental.preprocessing.Normalization())
+        )
 
     return {'normalized_inputs': norm(x), 'feature_columns': feature_columns}
 
@@ -81,8 +84,13 @@ def string_input_to_encoding(symbolic_inputs, preprocessed_inputs, raw_data, nee
         # Convert the lookup indices into one-hor vector (Example: from a index 3 to [0, 0, 0, 1])
         x = one_hot(x)
 
-        feature_columns.append(tf.feature_column.categorical_column_with_vocabulary_list(
-            name, np.unique(raw_data[name])))
+        feature_columns.append(
+            tf.feature_column.indicator_column(
+                tf.feature_column.categorical_column_with_vocabulary_list(
+                    name, np.unique(raw_data[name])
+                )
+            )
+        )
         preprocessed_inputs.append(x)
 
-    return {preprocessed_inputs, feature_columns}
+    return [preprocessed_inputs, feature_columns]

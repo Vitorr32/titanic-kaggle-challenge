@@ -49,14 +49,15 @@ for pClass in range(3):
 ageMeans = np.around(ageMeans)
 
 # Now we will replace the empty Age values in the training dataset in accordance to the class and gender
-for i, row in combine[0].iterrows():
-    # Skip rows that don't have a null Age
-    if not(pd.isna(row['Age'])):
-        continue
+for dataset in combine:
+    for i, row in dataset.iterrows():
+        # Skip rows that don't have a null Age
+        if not(pd.isna(row['Age'])):
+            continue
 
-    rowClass = row['Pclass'] - 1
-    rowSex = 0 if row['Sex'] == 'male' else 1
-    combine[0].at[i, 'Age'] = ageMeans[rowClass, rowSex]
+        rowClass = row['Pclass'] - 1
+        rowSex = 0 if row['Sex'] == 'male' else 1
+        dataset.at[i, 'Age'] = ageMeans[rowClass, rowSex]
 
 
 # The features of sibling number(SibSo) and parent numbers(Parch) don't have a decent correlation with the survival
@@ -91,44 +92,68 @@ combine = [train_dataset, test_dataset]
 
 # Now we call the pre_processing file in the utils modules that will do the more advanced data mapping such as
 # Indexation of strings, one-hot string lookup, normalization of values and so on
-processed_inputs = pre_processing.preprocess_data(
+inputs, preprocessed_inputs, feature_columns = pre_processing.preprocess_data(
     train_dataset,
     ['Fare', 'Age'],
     ['Sex', 'Embarked', 'Title']
 )
 
-preprocessing_model = tf.keras.Model(processed_inputs['inputs'], processed_inputs['preprocessed_inputs'])
-tensor_inputs = processed_inputs['inputs']
+for feature_column in feature_columns:
+    print(feature_column)
 
-X_train = {name: np.array(value) for name, value in train_dataset.items()}
+ds = tf.data.Dataset.from_tensor_slices((dict(train_dataset), Y_train))
+ds = ds.shuffle(buffer_size=len(train_dataset))
+ds = ds.batch(32)
 
-NUM_EXAMPLES = len(Y_train)
+feature_layer = tf.keras.layers.DenseFeatures(feature_columns)
 
-def make_input_fn(X, y, n_epochs=None, shuffle=True):
-    def input_fn():
-        dataset = tf.data.Dataset.from_tensor_slices((X, y))
-        if shuffle:
-            dataset = dataset.shuffle(NUM_EXAMPLES)
-        # For training, cycle thru dataset as many times as need (n_epochs=None).
-        dataset = dataset.repeat(n_epochs)
-        # In memory training doesn't use batching.
-        dataset = dataset.batch(NUM_EXAMPLES)
-        return dataset
-    return input_fn
+model = tf.keras.Sequential([
+    feature_layer,
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dropout(.1),
+    tf.keras.layers.Dense(1, activation='sigmoid')
+])
+
+model.compile(optimizer='adam',
+              loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+              metrics=['accuracy'])
+
+model.fit(ds, epochs=10)
+
+test_ds = tf.data.Dataset.from_tensor_slices((dict(test_dataset), None))
+
+predictions = model.predict(test_ds)
+
+print(predictions)
+# preprocessing_model = tf.keras.Model(inputs, preprocessed_inputs)
+
+# X_train = {name: np.array(value) for name, value in train_dataset.items()}
+
+# NUM_EXAMPLES = len(Y_train)
+
+# def make_input_fn(X, y, n_epochs=None, shuffle=True):
+#     def input_fn():
+#         dataset = tf.data.Dataset.from_tensor_slices((X, y))
+#         if shuffle:
+#             dataset = dataset.shuffle(NUM_EXAMPLES)
+#         # For training, cycle thru dataset as many times as need (n_epochs=None).
+#         dataset = dataset.repeat(n_epochs)
+#         # In memory training doesn't use batching.
+#         dataset = dataset.batch(NUM_EXAMPLES)
+#         return dataset
+#     return input_fn
 
 
-# Training and evaluation input functions.
-train_input_fn = make_input_fn(X_train, Y_train)
-eval_input_fn = make_input_fn(X_train, Y_train, shuffle=False, n_epochs=1)
+# # Training and evaluation input functions.
+# train_input_fn = make_input_fn(X_train, Y_train)
+# eval_input_fn = make_input_fn(X_train, Y_train, shuffle=False, n_epochs=1)
 
-input_list = []
-for key, value in tensor_inputs.items():
-    tf.identity(value, name=key)
-    input_list.append(value)
+# print(feature_columns)
 
-linear_est = tf.estimator.LinearClassifier(input_list)
+# linear_est = tf.estimator.LinearClassifier(feature_columns=feature_columns)
 
-# # Train model.
-linear_est.train(train_input_fn, max_steps=100)
-result = linear_est.evaluate(eval_input_fn)
-print(pd.Series(result))
+# # # Train model.
+# linear_est.train(train_input_fn, max_steps=100)
+# result = linear_est.evaluate(eval_input_fn)
+# print(pd.Series(result))
