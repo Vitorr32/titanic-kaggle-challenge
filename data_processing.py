@@ -8,6 +8,9 @@ TESTSET_FILE_PATH = "./data/test.csv"
 
 training_data = pd.read_csv(DATASET_FILE_PATH)
 test_data = pd.read_csv(TESTSET_FILE_PATH)
+metadata = {
+    'dummies_metadata': None
+}
 
 # Remove outliers in the Fare attribute
 training_data = featCompl.removeRowsWhereColumnIsBeyondValue(
@@ -26,10 +29,22 @@ training_data, test_data = featEng.createFamilySize(training_data, test_data)
 # Modify Fare column
 training_data, test_data = featEng.calculateTrueFare(training_data, test_data)
 
-# Drop PassengerId, Cabin and Ticket
+# Complete Embarked Column with the mode of the datset
+training_data, test_data = featCompl.completeEmbarkedNotAssigned(
+    training_data, test_data)
+
+# Drop PassengerId, Cabin and Ticket as we couldn't find a value in they existing
 training_data, test_data = featEng.dropInconclusiveColumns(
     training_data, test_data, ['PassengerId', 'Cabin', 'Ticket'])
 
-# Complete Age column with regressor prediction
+# Convert non-numeric data into categorical data using dummies of Pandas
+training_data, test_data = featEng.createDummyVariables(
+    training_data, test_data, ['Title', 'Embarked', 'Sex'])
+
+# # Complete Age column with regressor prediction
 training_data, test_data = featCompl.completeAgeWithRandomForestRegressor(
     training_data, test_data)
+
+# Drop Name, Family Size, Siblings and Parents columns since they are not nescessary anymore
+training_data, test_data = featEng.dropInconclusiveColumns(
+    training_data, test_data, ['SibSp', 'Parch', 'FamilySize', 'Name'])

@@ -4,8 +4,6 @@ from sklearn.ensemble import RandomForestRegressor
 
 # Fill up missing data from the Embarked column, since it's only two of them we will just fill the the mode, the
 # most common value
-
-
 def completeEmbarkedNotAssigned(training_data, test_data):
     for dataset in [training_data, test_data]:
         freq_port = dataset.Embarked.dropna().mode()[0]
