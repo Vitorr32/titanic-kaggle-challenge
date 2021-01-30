@@ -54,8 +54,18 @@ def dropInconclusiveColumns(training_data, test_data, columns):
     return (training_data, test_data)
 
 
+def convertValuesToBoolean(training_data, test_data, column, oneValue):
+    for dataset in [training_data, test_data]:
+        dataset[column] = pd.Series(
+            np.where(dataset[column].values == oneValue, 1, 0), dataset.index)
+
+    return (training_data, test_data)
+
+
 def createDummyVariables(training_data, test_data, columns):
-    training_data = pd.get_dummies(training_data, columns=columns, drop_first=False)
-    training_data = pd.get_dummies(test_data, columns=columns, drop_first=False)
-    
+    training_data = pd.get_dummies(
+        training_data, columns=columns, drop_first=False)
+    test_data = pd.get_dummies(
+        test_data, columns=columns, drop_first=False)
+
     return (training_data, test_data)

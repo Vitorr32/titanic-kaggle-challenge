@@ -33,15 +33,23 @@ training_data, test_data = featEng.calculateTrueFare(training_data, test_data)
 training_data, test_data = featCompl.completeEmbarkedNotAssigned(
     training_data, test_data)
 
+# Complete Fare column with the mean of the dataset
+training_data, test_data = featCompl.completeValuesWithMean(
+    training_data, test_data, 'Fare')
+
 # Drop PassengerId, Cabin and Ticket as we couldn't find a value in they existing
 training_data, test_data = featEng.dropInconclusiveColumns(
     training_data, test_data, ['PassengerId', 'Cabin', 'Ticket'])
 
 # Convert non-numeric data into categorical data using dummies of Pandas
 training_data, test_data = featEng.createDummyVariables(
-    training_data, test_data, ['Title', 'Embarked', 'Sex'])
+    training_data, test_data, ['Title', 'Embarked'])
 
-# # Complete Age column with regressor prediction
+# Conver the male/female values to 0/1 respectively
+training_data, test_data = featEng.convertValuesToBoolean(
+    training_data, test_data, 'Sex', 'female')
+
+# Complete Age column with regressor prediction
 training_data, test_data = featCompl.completeAgeWithRandomForestRegressor(
     training_data, test_data)
 
