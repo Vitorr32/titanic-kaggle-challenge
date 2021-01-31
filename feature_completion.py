@@ -26,7 +26,7 @@ def completeAgeWithRandomForestRegressor(training_data, test_data):
     test = pd.concat([test_data[["Age", "Sex"]],
                       test_data.loc[:, "SibSp":]], axis=1)
 
-    for dataset in [[test, test_data]]:
+    for dataset in [[train, training_data], [test, test_data]]:
         # Getting all features expect Survived, notice that the test data already has no Survived column
         ageDataset = dataset[0].loc[:, dataset[0].columns != 'Survived']
 

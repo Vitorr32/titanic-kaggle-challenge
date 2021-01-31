@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 
-
 def createTitleFeature(training_data, test_data):
     for dataset in [training_data, test_data]:
         # Extract the first word that ends with a dot, therefore Mr. Anderson would be replaced with Mr.
@@ -46,7 +45,7 @@ def calculateTrueFare(training_data, test_data):
     return (training_data, test_data)
 
 
-def dropInconclusiveColumns(training_data, test_data, columns):
+def dropColumns(training_data, test_data, columns):
     for dataset in [training_data, test_data]:
         for column in columns:
             dataset.drop([column], axis=1, inplace=True)
@@ -69,3 +68,7 @@ def createDummyVariables(training_data, test_data, columns):
         test_data, columns=columns, drop_first=False)
 
     return (training_data, test_data)
+
+
+def separateDependentVariables(dataset, columns):
+    return (dataset.drop(columns, axis=1), dataset[columns])
